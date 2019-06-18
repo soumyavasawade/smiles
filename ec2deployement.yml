@@ -1,0 +1,203 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EC2 Template'
+Parameters:
+  OSType:
+    Description: OS type
+    Type: String
+    AllowedValues:
+      - "RHEL"
+      - "AmazonLinux"
+      - "Windows"
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance.
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  ImageId:
+    Description: AMI Id of the iamge
+    Type: String
+    AllowedPattern: "([a-zA-Z0-9-]*)"
+    ConstraintDescription: First 3 characters must be lowercase alphabet following by -  and Allows only alphanumeric.
+  InstanceType:
+    Description: EC2 Instance Type
+    Type: String
+    ConstraintDescription: must be a valid EC2 instance type.
+    AllowedValues:
+      - "t1.micro"
+      - "t2.micro"
+      - "t2.small"
+      - "t2.medium"
+      - "t2.large"
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VpcId of your existing VPC
+    ConstraintDescription: VPC Id of an existing VPC
+  Subnets:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public/Private SubnetIds in your VPC
+    ConstraintDescription: Must be one subnets in same VPC
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security Group for VM
+    ConstraintDescription: Existing Security Group Id in your VPC
+  Volumetype:
+    Type: String
+    Description: Select Voulme Type.
+    Default: "gp2"
+    AllowedValues:
+      - "gp2"
+      - "io1"
+  AttachInstanceprofile:
+    Type: String
+    Default: 'No'
+    Description: 'If you wish to attach IAMInstacneprofile, please select Yes and enter profile name in IAMInstanceprofile.'
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  IAMInstanceprofile:
+    Type: String
+    Description: Name of your instance profile.
+    Default: ' '
+  IOPS:
+    Type: Number
+    Description: "If you select gp2 leave it like that, if you select io1 volumetype enter your customized iops"
+    Default: '200'
+    MinValue: '100'
+    MaxValue: '32000'
+    ConstraintDescription: "For Provisioned IOPS (SSD) volumes, you can provision up to 50 IOPS per GiB."
+  Detailedmonitoring:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+     - 'true'
+     - 'false'
+  EC2Instancename:
+    Description: EC2Instancename for the server.
+    Type: String
+  backup:
+    Type: String
+    Description: Do you need backup of your instance
+    Default: "no"
+    AllowedValues:
+      - "yes"
+      - "no"
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    -
+      Label:
+        default: "Choose AMI"
+      Parameters:
+        - OSType
+    -
+      Label:
+        default: "Choose Instance Type"
+      Parameters:
+        - InstanceType
+        - ImageId
+    -
+      Label:
+        default: "Configure Instance"
+      Parameters:
+        - VpcId
+        - Subnets
+        - AttachInstanceprofile
+        - IAMInstanceprofile
+    -
+      Label:
+        default: "Add Storage"
+      Parameters:
+        - Volumetype
+        - IOPS
+    -
+      Label:
+        default: "Add Tags"
+      Parameters:
+        - EC2Instancename
+        - backup
+    -
+      Label:
+        default: "Configure Security Group"
+      Parameters:
+        - SecurityGroupId
+    -
+      Label:
+        default: "Select an existing key pair"
+      Parameters:
+        - Detailedmonitoring
+Mappings:
+  Typeofos:
+    AmazonLinux:
+      voltype: "/dev/xvda"
+    RHEL:
+      voltype: "/dev/sda1"
+
+Conditions:
+    CreateLinux: !Or [!Equals [ !Ref OSType, RHEL ], !Equals [ !Ref OSType, AmazonLinux ]]
+    CreateWindows: !Equals [ !Ref OSType, Windows ]
+    CreateIops: !Equals ['io1', !Ref Volumetype]
+    Attachprofile: !Equals ['Yes', !Ref AttachInstanceprofile]
+Resources:
+  EC2Linux:
+    Type: "AWS::EC2::Instance"
+    Condition: CreateLinux
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref Subnets
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      IamInstanceProfile: !If [Attachprofile, !Ref IAMInstanceprofile, !Ref 'AWS::NoValue']
+      BlockDeviceMappings:
+        -
+          DeviceName: !FindInMap [Typeofos, !Ref OSType, voltype]
+          Ebs:
+            VolumeSize: '10'
+            VolumeType: !Ref Volumetype
+            Iops: !If [CreateIops, '100', !Ref 'AWS::NoValue']
+      Monitoring : !Ref Detailedmonitoring
+      Tags:
+        - Key: Name
+          Value: !Ref EC2Instancename
+        - Key: backup
+          Value: !Ref backup
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+  EC2Windows:
+    Type: "AWS::EC2::Instance"
+    Condition: CreateWindows
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref Subnets
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      IamInstanceProfile: !If [Attachprofile, !Ref IAMInstanceprofile, !Ref 'AWS::NoValue']
+      BlockDeviceMappings:
+        -
+          DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: '30'
+            VolumeType: !Ref Volumetype
+            Iops: !If [CreateIops, '100', !Ref 'AWS::NoValue']
+      Monitoring : !Ref Detailedmonitoring
+      Tags:
+        - Key: Name
+          Value: !Ref EC2Instancename
+        - Key: backup
+          Value: !Ref backup
+      UserData:
+        'Fn::Base64': !Sub |
+Outputs:
+  Linuxoutputs:
+    Condition: CreateLinux
+    Description: "InstanceId of your linux machine"
+    Value: !Ref EC2Linux
+  Windowsoutputs:
+    Condition: CreateWindows
+    Description: "InstanceId of your Windows machine"
+    Value: !Ref EC2Windows
