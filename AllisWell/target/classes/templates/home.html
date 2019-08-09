@@ -1,0 +1,67 @@
+<html>
+<body style="background-color:powderblue;">
+	<head>
+		<title>hello</title>
+		<style>
+			table, th, td {
+			   border: 1px solid black;
+			   border-spacing: 0px;
+			}
+			th, td {
+				padding: 10px;
+			}
+	.yellowtext {
+	color: yellow;
+}
+		
+.redtext {
+	color: red;
+}
+input[type=text] {
+  width: 100%;
+  padding: 12px 20px;
+  margin: 8px 0;
+  box-sizing: border-box;
+  border: none;
+  background-color: #3CBC8D;
+  color: white;
+}
+</style>
+	</head>
+	<h1 class="redtext">WELCOME TO OUR TEAM</h1>
+	<body>
+		<table>
+			<thead>
+				<tr>
+					<th class="redtext">Name       </th>
+					<th class="redtext">Email      </th>
+					<th class="redtext">Address    </th>
+					<th class="redtext">Phonenumber</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr th:each="userData : ${userDataList}">
+					<td th:text="${userData.name}"></td>
+					<td th:text="${userData.email}"></td>
+					<td th:text="${userData.address}"></td>
+					<td th:text="${userData.phonenumber}"></td>
+				</tr>
+			</tbody>
+		</table>
+		<br />
+		<h2>Add User</h2>
+		<form action="/addUserData" method="POST">
+			Name        :<input type="text" id="name" name="name" /><br />
+			Email       :<input type="text" id="email" name="email" /><br />
+			Phonenumber :<input type="text" id="phonenumber" name="phonenumber" /><br />
+			Address     :<input type="text" id="address" name="address" /><br />
+			<input type="submit" />
+		</form>
+		<h2>Search User</h2>
+		<form action="/search" method="POST">
+			<input type="text" name="search" id="search" th:value="${search}" />
+			<input type="submit" value="Search" />
+		</form>
+	</body>
+	</body>
+	</html>
